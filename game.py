@@ -36,6 +36,7 @@ class Game:
             'player/slide': Animation(load_images('entities/player/slide')),
             'player/wall_slide': Animation(load_images('entities/player/wall_slide')),
             'particles/leaf': Animation(load_images('particles/leaf'), img_dur=20, loop = False),
+            'particles/particle': Animation(load_images('particles/particle'), img_dur=6, loop = False),
         }
         
         self.clouds = Clouds(self.assets['clouds'], count=16)
@@ -80,6 +81,7 @@ class Game:
                 kill = particle.update()
                 particle.render(self.display, offset = render_scroll)
                 if particle.type == 'leaf': 
+                    #This is the sway of the particles i.e. leaves, as a sine wave like motion appears more natural than just left and right 
                     particle.pos[0] += math.sin(particle.animation.frame * 0.035) * 0.3
                 if kill:
                     self.particles.remove(particle)
@@ -94,7 +96,10 @@ class Game:
                     if event.key == pygame.K_RIGHT:
                         self.movement[1] = True
                     if event.key == pygame.K_UP:
-                        self.player.velocity[1] = -3
+                        #WALL SLIDE JUMP DOESNT WORK SOMEONE PLS FIX THIS SHIT IM GOING INSANE 
+                        self.player.jump()
+                    if event.key == pygame.K_x:
+                        self.player.dash()                    
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_LEFT:
                         self.movement[0] = False
