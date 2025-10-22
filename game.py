@@ -35,8 +35,8 @@ class Game:
             'player/jump': Animation(load_images('entities/player/jump')),
             'player/slide': Animation(load_images('entities/player/slide')),
             'player/wall_slide': Animation(load_images('entities/player/wall_slide')),
-            'particles/leaf': Animation(load_images('particles/leaf'), img_dur=20, loop = False),
-            'particles/particle': Animation(load_images('particles/particle'), img_dur=6, loop = False),
+            'particle/leaf': Animation(load_images('particles/leaf'), img_dur=20, loop=False),
+            'particle/particle': Animation(load_images('particles/particle'), img_dur=6, loop=False),
         }
         
         self.clouds = Clouds(self.assets['clouds'], count=16)
@@ -48,10 +48,9 @@ class Game:
         
         self.leaf_spawners = []
         for tree in self.tilemap.extract([('large_decor', 2)], keep=True):
-            self.leaf_spawners.append(pygame.Rect(4 + tree['pos'][0], 4+tree['pos'][1], 23, 13))
-
+            self.leaf_spawners.append(pygame.Rect(4 + tree['pos'][0], 4 + tree['pos'][1], 23, 13))
+            
         self.particles = []
-
         
         self.scroll = [0, 0]
         
@@ -62,12 +61,11 @@ class Game:
             self.scroll[0] += (self.player.rect().centerx - self.display.get_width() / 2 - self.scroll[0]) / 30
             self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
             render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
-
+            
             for rect in self.leaf_spawners:
                 if random.random() * 49999 < rect.width * rect.height:
                     pos = (rect.x + random.random() * rect.width, rect.y + random.random() * rect.height)
-                    self.particles.append(Particle(self, 'leaf', pos, velocity = [-0.1, 0.3], frame = random.randint(0, 20)))
-
+                    self.particles.append(Particle(self, 'leaf', pos, velocity=[-0.1, 0.3], frame=random.randint(0, 20)))
             
             self.clouds.update()
             self.clouds.render(self.display, offset=render_scroll)
@@ -76,12 +74,11 @@ class Game:
             
             self.player.update(self.tilemap, (self.movement[1] - self.movement[0], 0))
             self.player.render(self.display, offset=render_scroll)
-
+            
             for particle in self.particles.copy():
                 kill = particle.update()
-                particle.render(self.display, offset = render_scroll)
-                if particle.type == 'leaf': 
-                    #This is the sway of the particles i.e. leaves, as a sine wave like motion appears more natural than just left and right 
+                particle.render(self.display, offset=render_scroll)
+                if particle.type == 'leaf':
                     particle.pos[0] += math.sin(particle.animation.frame * 0.035) * 0.3
                 if kill:
                     self.particles.remove(particle)
@@ -96,10 +93,9 @@ class Game:
                     if event.key == pygame.K_RIGHT:
                         self.movement[1] = True
                     if event.key == pygame.K_UP:
-                        #WALL SLIDE JUMP DOESNT WORK SOMEONE PLS FIX THIS SHIT IM GOING INSANE 
                         self.player.jump()
                     if event.key == pygame.K_x:
-                        self.player.dash()                    
+                        self.player.dash()
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_LEFT:
                         self.movement[0] = False
