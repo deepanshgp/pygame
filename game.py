@@ -70,13 +70,18 @@ class Game:
         
     def load_level(self, map_id):
         self.tilemap.load('data/maps/' + str(map_id) + '.json')
+        #this resets the character state on level change    
+    
+        self.player.velocity = [0,0]
+        self.player.dashing  = 0
+        self.player.air_time = 0
         
         self.leaf_spawners = []
         for tree in self.tilemap.extract([('large_decor', 2)], keep=True):
             self.leaf_spawners.append(pygame.Rect(4 + tree['pos'][0], 4 + tree['pos'][1], 23, 13))
             
         self.enemies = []
-        for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1)]):
+        for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 2)]):
             if spawner['variant'] == 0:
                 self.player.pos = spawner['pos']
                 self.player.air_time = 0
@@ -184,20 +189,20 @@ class Game:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_LEFT:
+                    if event.key in (pygame.K_LEFT, pygame.K_a):
                         self.movement[0] = True
-                    if event.key == pygame.K_RIGHT:
+                    if event.key in (pygame.K_RIGHT, pygame.K_d):
                         self.movement[1] = True
-                    if event.key == pygame.K_UP:
+                    if event.key in (pygame.K_UP, pygame.K_w, pygame.K_SPACE):
                         #self.player.jump()
                         if self.player.jump():
                             self.sfx['jump'].play()
-                    if event.key == pygame.K_x:
+                    if event.key in (pygame.K_x, pygame.K_k):
                         self.player.dash()
                 if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_LEFT:
+                    if event.key in (pygame.K_LEFT, pygame.K_a):
                         self.movement[0] = False
-                    if event.key == pygame.K_RIGHT:
+                    if event.key in (pygame.K_RIGHT, pygame.K_d):
                         self.movement[1] = False
             
             if self.transition:

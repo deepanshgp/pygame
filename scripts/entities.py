@@ -146,7 +146,7 @@ class Player(PhysicsEntity):
     
     def update(self, tilemap, movement=(0, 0)):
         super().update(tilemap, movement=movement)
-        
+        input_dir  = movement[0]
         self.air_time += 1
         
         if self.air_time > 120:
@@ -176,6 +176,16 @@ class Player(PhysicsEntity):
             else:
                 self.set_action('idle')
         
+        #(((unsuccessfully))) implementing dash cancel 
+        input_dir = movement[0]
+        if self.dashing != 0:
+            dash_dir = int(abs(self.dashing)/self.dashing)
+            if input_dir != 0 and input_dir != dash_dir:
+                self.dashing = 0
+                self.velocity[0]
+                #okay so I accidentally did a thing that instead of dash cancel, it launches you into the opposite direction instead lmao. I think it's pretty cool let's see if anyone actually notices it lmaoaoaoa, fun lil easter egg lol
+                self.flip = input_dir
+
         if abs(self.dashing) in {60, 50}:
             for i in range(20):
                 angle = random.random() * math.pi * 2
