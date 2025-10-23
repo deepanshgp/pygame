@@ -181,9 +181,14 @@ class Game:
             
             if self.transition:
                 #Holy Resource intensive we making surface on surface crazy
-                transition_surf = pygame.Surface(self.display.get_size())
-                pygame.draw.circle(transition_surf, (255, 255, 255,), (self.display.get_width() // 2, self.display.get_height() // 2), (30 - abs(self.transition)*8))
-                transition_surf.set_colorkey((255, 255, 255))
+                #used Alpha keying instead of color keying because it is smoother 
+                
+                transition_surf = pygame.Surface(self.display.get_size(), pygame.SRCALPHA)
+                radius = max(0, 300 - abs(self.transition)*8) #had 30 instead of 300 here making it choppy because long jumps in radius int
+                #also made ts cleaner because earlier it looked like a pattern code
+                center = (self.display.get_width()) // 2, (self.display.get_height()) // 2
+                transition_surf.fill((0, 0, 0, 255))
+                pygame.draw.circle(transition_surf, (0,0,0,0), center, int(radius))
                 self.display.blit(transition_surf, (0,0))
                 
 
