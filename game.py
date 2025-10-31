@@ -1,6 +1,7 @@
 import sys
 import math
 import random
+import os
 
 import pygame
 import pygame.gfxdraw
@@ -43,7 +44,10 @@ class Game:
             'particle/particle': Animation(load_images('particles/particle'), img_dur=6, loop=False),
             'gun': load_image('gun.png'),
             'projectile': load_image('projectile.png'),
+            'font': pygame.font.Font(r'D:\pygame-1\data\images\font\upheavtt.ttf', 16),
         }
+        font_path = os.path.join('data', 'images', 'font', 'upheavtt.ttf')
+        self.assets['font'] = pygame.font.Font(font_path, 32)
 
         self.sfx = {
             'jump': pygame.mixer.Sound('data/sfx/jump.wav'),
@@ -213,28 +217,42 @@ class Game:
             self.combo = 0
             self.combo_multiplier = 1
 
-    def render_score_ui(self):
-        """Render score, combo, and high score on screen"""
-        # Create a font (you might want to load this in __init__ for better performance)
+    def render_score_ui(self, surface):
+        """Render score, combo, and high score on screen with dynamic font scaling"""
+
+        # Base size for reference (assuming your base surface is 320x240)
+        base_width = 320
+        scale_factor = self.display.get_width() / base_width
+
+        # Dynamically scale font size
+        scaled_font_size = int(24 * scale_factor)
+        small_scaled_font_size = int(18 * scale_factor)
+
+        # Here use a try except if for some reason our font does not exist or fail to load
         try:
-            font = pygame.font.Font(None, 16)  # Default font, size 16
-            small_font = pygame.font.Font(None, 12)
-        except:
-            font = pygame.font.SysFont('arial', 16)
-            small_font = pygame.font.SysFont('arial', 12)
-        
+            font = pygame.font.Font('font/Upheavtt.ttf', scaled_font_size)
+            small_font = pygame.font.Font('font/Upheavtt.ttf', small_scaled_font_size)
+        except Exception as e:
+            print("Font load failed:", e)
+            font = pygame.font.Font(None, scaled_font_size)
+            small_font = pygame.font.Font(None, small_scaled_font_size)
+
         # Score display
         score_text = font.render(f'Score: {self.score}', True, (255, 255, 255))
-        self.display.blit(score_text, (5, 5))
-        
-        # Combo display (only show when active)
+        self.display.blit(score_text, (10, 10))
+
+        # High score
+        high_score_text = small_font.render(f'High: {self.high_score}', True, (255, 255, 255))
+        self.display.blit(high_score_text, (5, 10 + score_text.get_height()))
+
+        # Combo display 
         if self.combo > 1:
             combo_color = (
                 min(255, 100 + self.combo * 20),  # R
                 min(255, 200 - self.combo * 10),  # G  
-                min(255, 100 + self.combo * 15)   # B
+                min(255, 100 + self.combo * 15)   # B   
             )
-            
+
             combo_text = font.render(f'COMBO x{self.combo_multiplier}!', True, combo_color)
             combo_rect = combo_text.get_rect(topright=(self.display.get_width() - 5, 5))
             self.display.blit(combo_text, combo_rect)
@@ -539,7 +557,7 @@ class Game:
                         self.movement[1] = False
 
             # RENDER SCORE UI 
-            self.render_score_ui()
+            self.render_score_ui(self.screen)
             self.render_score_popups()
             
             if self.transition:
@@ -557,6 +575,7 @@ class Game:
 
             screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
             self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), screenshake_offset)
+            self.render_score_ui(self.screen)
             pygame.display.update()
             self.clock.tick(60)
 
