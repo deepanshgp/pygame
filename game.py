@@ -5,7 +5,7 @@ import random
 import pygame
 
 from scripts.utils import load_image, load_images, Animation
-from scripts.entities import PhysicsEntity, Player, Enemy
+from scripts.entities import PhysicsEntity, Player, Enemy , DashEnemy
 from scripts.tilemap import Tilemap
 from scripts.clouds import Clouds
 from scripts.particle import Particle
@@ -67,6 +67,17 @@ class Game:
         self.load_level(self.level)
         
         self.screenshake = 0
+
+        # Add score system variables
+        self.score = 0
+        self.high_score = 0
+        self.combo = 0
+        self.combo_timer = 0
+        self.combo_multiplier = 1
+        self.last_kill_time = 0
+        
+        # Load high score from file
+        self.load_high_score()
         
     def load_level(self, map_id):
         self.tilemap.load('data/maps/' + str(map_id) + '.json')
@@ -85,8 +96,10 @@ class Game:
             if spawner['variant'] == 0:
                 self.player.pos = spawner['pos']
                 self.player.air_time = 0
-            else:
+            elif spawner['variant'] == 1:
                 self.enemies.append(Enemy(self, spawner['pos'], (8, 15)))
+            elif spawner['variant'] == 2:  # New dashing enemy
+                self.enemies.append(DashEnemy(self, spawner['pos'], (8, 15)))
             
         self.projectiles = []
         self.particles = []
@@ -95,6 +108,135 @@ class Game:
         self.scroll = [0, 0]
         self.dead = 0
         self.transition = -30   
+
+    def load_high_score(self):
+        """Load high score from file"""
+        try:
+            with open('data/high_score.txt', 'r') as f:
+                self.high_score = int(f.read().strip())
+        except (FileNotFoundError, ValueError):
+            self.high_score = 0
+            
+    def save_high_score(self):
+        """Save high score to file"""
+        if self.score > self.high_score:
+            self.high_score = self.score
+            try:
+                with open('data/high_score.txt', 'w') as f:
+                    f.write(str(self.high_score))
+            except:
+                pass  # Silently fail if can't save
+    
+    def add_score(self, points, enemy_type="enemy"):
+        """Add points to score with combo system"""
+        current_time = pygame.time.get_ticks()
+        
+        # Combo system: if kills are close together, increase multiplier
+        if current_time - self.last_kill_time < 2000:  # 2 second window
+            self.combo += 1
+            self.combo_timer = 180  # 3 seconds at 60 FPS
+            self.combo_multiplier = min(5, 1 + self.combo // 3)  # Max 5x multiplier
+        else:
+            self.combo = 1
+            self.combo_multiplier = 1
+            self.combo_timer = 180
+            
+        self.last_kill_time = current_time
+        
+        # Calculate final points with multiplier
+        final_points = points * self.combo_multiplier
+        
+        # Bonus points for different enemy types
+        if enemy_type == "dash_enemy":
+            final_points = int(final_points * 1.5)  # 50% more for dashing enemies
+            
+        self.score += final_points
+        
+        # Create score popup effect
+        self.create_score_popup(final_points, self.combo_multiplier)
+        
+        return final_points
+    
+    def create_score_popup(self, points, multiplier):
+        """Create floating score text at player position"""
+        # We'll store popups in a list and render them
+        if not hasattr(self, 'score_popups'):
+            self.score_popups = []
+        
+        popup = {
+            'text': f'+{points}',
+            'pos': [self.player.pos[0], self.player.pos[1] - 20],
+            'timer': 60,  # 1 second at 60 FPS
+            'color': (255, 255, 0) if multiplier > 1 else (255, 255, 255),
+            'size': 8 + (multiplier * 2)
+        }
+        self.score_popups.append(popup)
+
+    def render_score_popups(self):
+        """Render floating score popups"""
+        if hasattr(self, 'score_popups'):
+            for popup in self.score_popups[:]:  # Use copy for safe iteration
+                popup['timer'] -= 1
+                popup['pos'][1] -= 0.5  # Float upward
+                
+                # Create font for this popup
+                try:
+                    font = pygame.font.Font(None, popup['size'])
+                    text_surface = font.render(popup['text'], True, popup['color'])
+                    
+                    # Calculate position with scroll offset
+                    render_pos = (
+                        popup['pos'][0] - self.scroll[0] - text_surface.get_width() // 2,
+                        popup['pos'][1] - self.scroll[1]
+                    )
+                    
+                    self.display.blit(text_surface, render_pos)
+                    
+                except:
+                    pass
+                
+                # Remove expired popups
+                if popup['timer'] <= 0:
+                    self.score_popups.remove(popup)
+    
+    def update_combo(self):
+        """Update combo timer"""
+        if self.combo_timer > 0:
+            self.combo_timer -= 1
+        else:
+            self.combo = 0
+            self.combo_multiplier = 1
+
+    def render_score_ui(self):
+        """Render score, combo, and high score on screen"""
+        # Create a font (you might want to load this in __init__ for better performance)
+        try:
+            font = pygame.font.Font(None, 16)  # Default font, size 16
+            small_font = pygame.font.Font(None, 12)
+        except:
+            font = pygame.font.SysFont('arial', 16)
+            small_font = pygame.font.SysFont('arial', 12)
+        
+        # Score display
+        score_text = font.render(f'Score: {self.score}', True, (255, 255, 255))
+        self.display.blit(score_text, (5, 5))
+        
+        # High score
+        high_score_text = small_font.render(f'High: {self.high_score}', True, (255, 255, 255))
+        self.display.blit(high_score_text, (5, 25))
+        
+        # Combo display (only show when active)
+        if self.combo > 1:
+            combo_color = (
+                min(255, 100 + self.combo * 20),  # R
+                min(255, 200 - self.combo * 10),  # G  
+                min(255, 100 + self.combo * 15)   # B
+            )
+            
+            combo_text = font.render(f'COMBO x{self.combo_multiplier}!', True, combo_color)
+            combo_rect = combo_text.get_rect(topright=(self.display.get_width() - 5, 5))
+            self.display.blit(combo_text, combo_rect)
+            
         
     def run(self):
         pygame.mixer.music.load('data/music.wav')
@@ -103,7 +245,8 @@ class Game:
         self.sfx['ambience'].play(-1)
         while True:
             self.display.blit(self.assets['background'], (0, 0))
-            
+            # Update combo system
+            self.update_combo()
             self.screenshake = max(0, self.screenshake - 1)
 
             if not len(self.enemies):
@@ -120,6 +263,12 @@ class Game:
                 if self.dead == 10:
                     self.transition = min(30, self.transition + 1)
                 if self.dead > 40:
+                    self.load_level(self.level)
+                    # Save high score before resetting
+                    self.save_high_score()
+                    self.score = 0
+                    self.combo = 0
+                    self.combo_timer = 0
                     self.load_level(self.level)
             
             self.scroll[0] += (self.player.rect().centerx - self.display.get_width() / 2 - self.scroll[0]) / 30
@@ -204,6 +353,10 @@ class Game:
                         self.movement[0] = False
                     if event.key in (pygame.K_RIGHT, pygame.K_d):
                         self.movement[1] = False
+
+            # RENDER SCORE UI 
+            self.render_score_ui()
+            self.render_score_popups()
             
             if self.transition:
                 #Holy Resource intensive we making surface on surface crazy
