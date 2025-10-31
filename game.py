@@ -3,6 +3,7 @@ import math
 import random
 
 import pygame
+import pygame.gfxdraw
 
 from scripts.utils import load_image, load_images, Animation
 from scripts.entities import PhysicsEntity, Player, Enemy , DashEnemy
@@ -68,9 +69,14 @@ class Game:
         
         self.screenshake = 0
 
-        # Add score system variables
+        # Initialize database
+        from scripts.database import HighScoreDB
+        self.db = HighScoreDB()
+        
+        # Score system
         self.score = 0
-        self.high_score = 0
+        self.high_score, self.high_score_level = self.db.get_high_score()  # Load from database
+        
         self.combo = 0
         self.combo_timer = 0
         self.combo_multiplier = 1
@@ -221,10 +227,6 @@ class Game:
         score_text = font.render(f'Score: {self.score}', True, (255, 255, 255))
         self.display.blit(score_text, (5, 5))
         
-        # High score
-        high_score_text = small_font.render(f'High: {self.high_score}', True, (255, 255, 255))
-        self.display.blit(high_score_text, (5, 25))
-        
         # Combo display (only show when active)
         if self.combo > 1:
             combo_color = (
@@ -236,6 +238,183 @@ class Game:
             combo_text = font.render(f'COMBO x{self.combo_multiplier}!', True, combo_color)
             combo_rect = combo_text.get_rect(topright=(self.display.get_width() - 5, 5))
             self.display.blit(combo_text, combo_rect)
+
+    def create_blurred_display(self):
+        """Create a blurred version of the current display """
+        try:
+            # Take a snapshot of the current display
+            display_snapshot = self.screen.copy()
+            
+            # SIMPLE BLUR: Scale down and scale up
+            # Scale down to 1/4 size
+            small_width = display_snapshot.get_width() // 4
+            small_height = display_snapshot.get_height() // 4
+            small_size = (max(1, small_width), max(1, small_height))
+            
+            # Scale down
+            small_surface = pygame.transform.scale(display_snapshot, small_size)
+            # Scale back up to create blur effect
+            blurred_surface = pygame.transform.scale(small_surface, display_snapshot.get_size())
+            
+            # Add dark overlay for better text readability
+            dark_overlay = pygame.Surface(blurred_surface.get_size(), pygame.SRCALPHA)
+            dark_overlay.fill((0, 0, 0, 100))  # Semi-transparent black
+            blurred_surface.blit(dark_overlay, (0, 0))
+            
+            print("Blur created successfully")  # Debug
+            return blurred_surface
+            
+        except Exception as e:
+            print(f"Blur failed: {e}")
+            # Return the original display instead of blue screen
+            return self.display.copy()
+
+    def show_high_scores(self):
+        """Show high scores screen with blurred display background"""
+        print("Showing high scores...")  # Debug
+        
+        # Create blurred version of the entire current display
+        blurred_bg = self.create_blurred_display()
+        
+        # Use the blurred background
+        self.display.blit(blurred_bg, (0, 0))
+        
+        # Render the high scores UI on top
+        self.render_high_scores_ui()
+        
+        # Update screen
+        self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0, 0))
+        pygame.display.update()
+        
+        # Wait for continue input
+        self.wait_for_continue_input()
+
+    def render_high_scores_ui(self):
+        """Simple fixed positioning for 320x240 display"""
+        # Get high scores from database
+        top_scores = self.db.get_top_scores(3) if self.db else []
+        
+        # Font setup for 320x240
+        try:
+            font = pygame.font.Font(None, 16)
+            title_font = pygame.font.Font(None, 24)
+            big_font = pygame.font.Font(None, 32)
+        except:
+            font = pygame.font.SysFont('arial', 16)
+            title_font = pygame.font.SysFont('arial', 24)
+            big_font = pygame.font.SysFont('arial', 32)
+        
+        center_x = 160  # Fixed center for 320 width
+        
+        # Clear any existing content by redrawing the blurred background
+        blurred_bg = self.create_blurred_display()
+        self.display.blit(blurred_bg, (0, 0))
+        
+        # Title
+        title = big_font.render('GAME OVER', True, (255, 255, 0))
+        title_rect = title.get_rect(center=(center_x, 30))
+        
+        # Title background
+        title_bg = pygame.Surface((title_rect.width + 20, title_rect.height + 10), pygame.SRCALPHA)
+        title_bg.fill((0, 0, 0, 0))
+        title_bg_rect = title_bg.get_rect(center=(center_x, 30))
+        self.display.blit(title_bg, title_bg_rect)
+        self.display.blit(title, title_rect)
+        
+        # Current session info
+        current_score = title_font.render(f'Score: {self.score}', True, (255, 255, 255))
+        current_level = title_font.render(f'Level: {self.level}', True, (200, 200, 255))
+        
+        current_score_rect = current_score.get_rect(center=(center_x, 60))
+        current_level_rect = current_level.get_rect(center=(center_x, 85))
+        
+        self.display.blit(current_score, current_score_rect)
+        self.display.blit(current_level, current_level_rect)
+        
+        # High scores list
+        scores_title = title_font.render('TOP SCORES', True, (255, 200, 0))
+        scores_title_rect = scores_title.get_rect(center=(center_x, 120))
+        self.display.blit(scores_title, scores_title_rect)
+        
+        # Display top scores
+        if top_scores:
+            for i, (score, level, date) in enumerate(top_scores):
+                score_y = 140 + (i * 25)
+                
+                # Highlight current score
+                if score == self.score and level == self.level:
+                    color = (0, 255, 255)
+                else:
+                    color = (255, 255, 255)
+                    
+                score_text = font.render(f'{i+1}. {score} (Level {level})', True, color)
+                score_rect = score_text.get_rect(center=(center_x, score_y))
+                self.display.blit(score_text, score_rect)
+        else:
+            no_scores = font.render('No high scores yet!', True, (200, 200, 200))
+            no_scores_rect = no_scores.get_rect(center=(center_x, 160))
+            self.display.blit(no_scores, no_scores_rect)
+        
+        # Instructions
+        instructions = font.render('Press SPACE to continue', True, (200, 200, 100))
+        instructions_rect = instructions.get_rect(center=(center_x, 220))
+        self.display.blit(instructions, instructions_rect)
+        
+        # New high score celebration
+        is_new_high_score = (self.db and self.score > 0 and 
+                        self.score == self.high_score and 
+                        self.level == self.high_score_level)
+        
+        if is_new_high_score:
+            celebration = title_font.render('NEW HIGH SCORE!', True, (255, 50, 50))
+            celebration_rect = celebration.get_rect(center=(center_x, 110))
+            self.display.blit(celebration, celebration_rect)
+
+    def wait_for_continue_input(self):
+        """Wait for user to press space to continue"""
+        waiting = True
+        is_new_high_score = (self.db and self.score > 0 and 
+                        self.score == self.high_score and 
+                        self.level == self.high_score_level)
+        
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_ESCAPE):
+                        waiting = False
+            
+            # Pulsing animation for new high score
+            if is_new_high_score:
+                current_time = pygame.time.get_ticks()
+                pulse = (current_time // 200) % 2
+                
+                center_x = self.display.get_width() // 2
+                scores_y = 150
+                celebration_y = scores_y - 20
+                
+                # Redraw celebration with pulsing color
+                celebration_bg = pygame.Surface((250, 35), pygame.SRCALPHA)
+                celebration_color = (255, 255, 0, 200) if pulse else (255, 50, 50, 180)
+                celebration_bg.fill(celebration_color)
+                celebration_bg_rect = celebration_bg.get_rect(center=(center_x, celebration_y))
+                
+                # Clear the celebration area by redrawing the blurred background
+                self.display.blit(self.create_blurred_display(), celebration_bg_rect, celebration_bg_rect)
+                
+                # Redraw celebration
+                self.display.blit(celebration_bg, celebration_bg_rect)
+                celebration = pygame.font.Font(None, 24).render('NEW HIGH SCORE!', True, (255, 255, 255))
+                celebration_rect = celebration.get_rect(center=(center_x, celebration_y))
+                self.display.blit(celebration, celebration_rect)
+                
+                # Update screen
+                self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), (0, 0))
+                pygame.display.update()
+            
+            self.clock.tick(60)
             
         
     def run(self):
@@ -263,13 +442,18 @@ class Game:
                 if self.dead == 10:
                     self.transition = min(30, self.transition + 1)
                 if self.dead > 40:
+                    # Save high score to database if it's a new record
+                    if self.score > self.high_score:
+                        self.db.save_high_score(self.score, self.level)
+                        
+                        self.high_score = self.score
+                        self.high_score_level = self.level
+                    # Show high scores screen
+                    self.show_high_scores()
                     self.load_level(self.level)
-                    # Save high score before resetting
-                    self.save_high_score()
-                    self.score = 0
+                    self.score = 0  # Reset score after saving
                     self.combo = 0
                     self.combo_timer = 0
-                    self.load_level(self.level)
             
             self.scroll[0] += (self.player.rect().centerx - self.display.get_width() / 2 - self.scroll[0]) / 30
             self.scroll[1] += (self.player.rect().centery - self.display.get_height() / 2 - self.scroll[1]) / 30
