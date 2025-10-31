@@ -44,7 +44,7 @@ class Game:
             'particle/particle': Animation(load_images('particles/particle'), img_dur=6, loop=False),
             'gun': load_image('gun.png'),
             'projectile': load_image('projectile.png'),
-            'font': pygame.font.Font(r'D:\pygame-1\data\images\font\upheavtt.ttf', 16),
+            'font': pygame.font.Font('data/images/font/upheavtt.ttf', 16),
         }
         font_path = os.path.join('data', 'images', 'font', 'upheavtt.ttf')
         self.assets['font'] = pygame.font.Font(font_path, 32)
